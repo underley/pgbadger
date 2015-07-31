@@ -193,6 +193,7 @@ my $zcat                    = $zcat_cmd;
 my $bzcat                   = 'bunzip2 -c';
 my $ucat                    = 'unzip -p';
 my $xzcat                   = 'xzcat';
+my $lzcat                   = 'lzcat';
 my $gzip_uncompress_size    = "gunzip -l %f | grep -E '^\\s*[0-9]+' | awk '{print \$2}'";
 my $zip_uncompress_size     = "unzip -l %f | awk '{if (NR==4) print \$1}'";
 my $xz_uncompress_size      = "xz --robot -l %f | grep totals | awk '{print \$5}'";
@@ -1256,7 +1257,7 @@ if ( ($#given_log_files >= 0) && (($queue_size > 1) || ($job_per_file > 1)) ) {
 		}
 
 		# Do not use split method with compressed files
-		if ( ($queue_size > 1) && ($logfile !~ /\.(gz|bz2|zip|xz)$/i) ) {
+		if ( ($queue_size > 1) && ($logfile !~ /\.(gz|bz2|zip|xz|lzma)$/i) ) {
 			# Create multiple processes to parse one log file by chunks of data
 			my @chunks = &split_logfile($logfile);
 			&logmsg('DEBUG', "The following boundaries will be used to parse file $logfile, " . join('|', @chunks));
@@ -12358,7 +12359,7 @@ sub get_log_file
 	my $totalsize = 0;
 	if (!$remote_host) {
 		$totalsize = (stat("$logf"))[7] || 0 if ($logf ne '-');
-	} elsif ($logf !~ /\.(gz|bz2|zip|xz)$/i) {
+	} elsif ($logf !~ /\.(gz|bz2|zip|xz|lzma)$/i) {
 		&logmsg('DEBUG', "Looking for file size using command: $ssh_command \"ls -l $logf\" | awk '{print \$5}'");
 		$totalsize = `$ssh_command "ls -l $logf" | awk '{print \$5}'`;
 		chomp($totalsize);
@@ -12373,7 +12374,7 @@ sub get_log_file
 	my $iscompressed = 1;
 
 	# Open a file handle
-	if ($logf !~ /\.(gz|bz2|zip|xz)$/i) {
+	if ($logf !~ /\.(gz|bz2|zip|xz|lzma)$/i) {
 		if (!$remote_host) {
 			open($lfile, $logf) || die "FATAL: cannot read log file $logf. $!\n";
 		} else {
@@ -12391,6 +12392,9 @@ sub get_log_file
 		}
 		elsif (($logf =~ /\.xz/i) && ($zcat =~ /^$zcat_cmd$/)) {
 			$uncompress = $xzcat;
+		}
+		elsif (($logf =~ /\.lzma/i) && ($zcat =~ /^$zcat_cmd$/)) {
+			$uncompress = $lzcat;
 		}
 		if (!$remote_host) {
 			&logmsg('DEBUG', "Compressed log file, will use command: $uncompress \"$logf\"");
@@ -12463,7 +12467,7 @@ sub split_logfile
 		$totalsize = `$cmd_file_size`;
 		chomp($totalsize);
 		$queue_size = 0;
-	} elsif ($logf =~ /\.bz2$/i) {
+	} elsif ($logf =~ /\.(bz2|lzma)$/i) {
 		$totalsize = 0;
 		$queue_size = 0;
 	}
